@@ -1,0 +1,49 @@
+name: Notify Platform on Push
+
+on:
+  push:
+    branches:
+      - main  # Sostituisci con il nome del tuo branch principale se necessario
+
+jobs:
+  notify-platform:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+
+    - name: Encode file content to Base64
+      id: file_content
+      run: |
+        content=$(base64 -w 0 CodeKataBattle.java)  # Codifica il contenuto del file in Base64
+        echo "::set-output name=content::$content"
+
+    - name: Format push time for LocalDateTime
+      id: formatted_time
+      run: |
+        push_time=$(date -u -d "${{ github.event.head_commit.timestamp }}" +"%Y-%m-%dT%H:%M:%S")
+        echo "::set-output name=push_time::$push_time"
+
+    - name: Extract repository name
+      id: repo_name
+      run: |
+        repo_name="${GITHUB_REPOSITORY##*/}"
+        echo "::set-output name=repo_name::$repo_name"
+
+    - name: Notify CKB Platform
+      env:
+        NGROK_URL: "https://50aa-93-68-191-0.ngrok-free.app/webhook"
+        CONTENT: ${{ steps.file_content.outputs.content }}
+        PUSH_TIME: ${{ steps.formatted_time.outputs.push_time }}
+        REPO_NAME: ${{ steps.repo_name.outputs.repo_name }}
+      run: |
+        payload='{
+          "eventId": "ID_EVENTO_O_UNIVOCO",
+          "repoUrl": "'"${REPO_NAME}"'",
+          "timestamp": "'"${PUSH_TIME}"'",
+          "functionalScore": 0,
+          "codeKataBattle": "'"${CONTENT}"'"
+        }'
+
+        curl -X POST "$NGROK_URL"           -H "Content-Type: application/json"           -d "$payload"
